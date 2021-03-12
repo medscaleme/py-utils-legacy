@@ -44,7 +44,7 @@ jobs:
           ratio_mid_fc: "500"
           ratio_mid_cap: "1500"
           target_end_fc: "20000"
-          target_end_following: "50"
+          target_end_following: "99"
           github_following_cap: "10000"
           action_delay: "1"
         run: bash x
