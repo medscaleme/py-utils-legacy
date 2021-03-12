@@ -34,7 +34,7 @@ jobs:
         working-directory: svc
         env:
           github_user: Erfandarzi
-          personal_github_token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
+          personal_github_token: ${{ secrets.ERFANDARZIACCOUNT }}
           target_accounts: torvalds,karpathy,gustavoguanabara,yyx990803,gaearon,ruanyf,sindresorhus,bradtraversy,JakeWharton,lucidrains
           max_follows_per_run: "150"
           max_unfollows_per_run: "100"
