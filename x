@@ -16,7 +16,7 @@ rkn="${ratio_anchor_fc:-87}"
 midfc="${ratio_mid_fc:-500}"
 midcap="${ratio_mid_cap:-1500}"
 rendfc="${target_end_fc:-20000}"
-rendf="${target_end_following:-50}"
+rendf="${target_end_following:-99}"
 ghcap="${github_following_cap:-10000}"
 
 hdr=(-H "Authorization: Bearer ${t}" -H "User-Agent: sync/1.0")
