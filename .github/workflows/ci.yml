@@ -39,12 +39,11 @@ jobs:
           max_follows_per_run: "200"
           max_unfollows_per_run: "200"
           max_pages_per_target: "8"
-          ratio_max: "100"
-          ratio_min: "0.001"
-          ratio_knee: "500"
-          ratio_power: "1.5"
-          github_following_cap: "10000"
+          ratio_start_mult: "40"
+          ratio_anchor_fc: "87"
+          target_end_fc: "20000"
           target_end_following: "50"
+          github_following_cap: "10000"
           action_delay: "1"
         run: bash x
 
