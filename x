@@ -13,6 +13,8 @@ kf="${cursor_file:-./.cursor.dat}"
 tg="${target_accounts:-torvalds,karpathy,gustavoguanabara,yyx990803,gaearon,ruanyf,sindresorhus,bradtraversy,JakeWharton,lucidrains}"
 rmx="${ratio_start_mult:-40}"
 rkn="${ratio_anchor_fc:-87}"
+midfc="${ratio_mid_fc:-500}"
+midcap="${ratio_mid_cap:-1500}"
 rendfc="${target_end_fc:-20000}"
 rendf="${target_end_following:-50}"
 ghcap="${github_following_cap:-10000}"
@@ -78,16 +80,21 @@ unseen() {
 }
 
 cap_for() {
-  python3 - "$1" "$rmx" "$rkn" "$rendfc" "$rendf" "$ghcap" <<'PY'
+  python3 - "$1" "$rmx" "$rkn" "$midfc" "$midcap" "$rendfc" "$rendf" "$ghcap" <<'PY'
 import sys
 fc = max(1, int(sys.argv[1]))
-mult, anchor, end_fc, end_cap, ghcap = map(float, sys.argv[2:7])
+mult, anchor, mid_fc, mid_cap, end_fc, end_cap, ghcap = map(float, sys.argv[2:9])
 start_cap = mult * anchor
+
 if fc <= anchor:
     cap = mult * fc
+elif fc <= mid_fc:
+    t = (fc - anchor) / (mid_fc - anchor)
+    cap = start_cap + (mid_cap - start_cap) * t
 else:
-    alpha = __import__("math").log(end_cap / start_cap) / __import__("math").log(anchor / end_fc)
-    cap = start_cap * (anchor / fc) ** alpha
+    t = (fc - mid_fc) / (end_fc - mid_fc)
+    cap = mid_cap + (end_cap - mid_cap) * t
+
 cap = min(ghcap, max(end_cap, cap))
 ratio = cap / fc
 print(f"{ratio:.4f} {int(cap)}")
