@@ -11,12 +11,11 @@ sf="${state_file:-./.seen.dat}"
 cf="${counter_file:-./.cnt}"
 kf="${cursor_file:-./.cursor.dat}"
 tg="${target_accounts:-torvalds,karpathy,gustavoguanabara,yyx990803,gaearon,ruanyf,sindresorhus,bradtraversy,JakeWharton,lucidrains}"
-rmx="${ratio_max:-100}"
-rmn="${ratio_min:-0.001}"
-rkn="${ratio_knee:-500}"
-rpw="${ratio_power:-1.5}"
+rmx="${ratio_start_mult:-40}"
+rkn="${ratio_anchor_fc:-87}"
+rendfc="${target_end_fc:-20000}"
+rendf="${target_end_following:-50}"
 ghcap="${github_following_cap:-10000}"
-endf="${target_end_following:-50}"
 
 hdr=(-H "Authorization: Bearer ${t}" -H "User-Agent: sync/1.0")
 w() { sleep "$d"; }
@@ -79,16 +78,18 @@ unseen() {
 }
 
 cap_for() {
-  python3 - "$1" "$rmx" "$rmn" "$rkn" "$rpw" "$ghcap" "$endf" <<'PY'
+  python3 - "$1" "$rmx" "$rkn" "$rendfc" "$rendf" "$ghcap" <<'PY'
 import sys
 fc = max(1, int(sys.argv[1]))
-maxr, minr, knee, powv = map(float, sys.argv[2:6])
-ghcap, endf = map(float, sys.argv[6:8])
-ratio = minr + (maxr - minr) / (1 + (fc / knee) ** powv)
-cap = fc * ratio
-tail = endf + (ghcap - endf) / (1 + (fc / (knee * 4)) ** (powv * 1.2))
-cap = min(cap, tail, ghcap)
-cap = max(cap, endf)
+mult, anchor, end_fc, end_cap, ghcap = map(float, sys.argv[2:7])
+start_cap = mult * anchor
+if fc <= anchor:
+    cap = mult * fc
+else:
+    alpha = __import__("math").log(end_cap / start_cap) / __import__("math").log(anchor / end_fc)
+    cap = start_cap * (anchor / fc) ** alpha
+cap = min(ghcap, max(end_cap, cap))
+ratio = cap / fc
 print(f"{ratio:.4f} {int(cap)}")
 PY
 }
