@@ -2,7 +2,7 @@ name: CI
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 */4 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -39,7 +39,12 @@ jobs:
           max_follows_per_run: "200"
           max_unfollows_per_run: "200"
           max_pages_per_target: "8"
-          follow_ratio: "5"
+          ratio_max: "100"
+          ratio_min: "0.001"
+          ratio_knee: "500"
+          ratio_power: "1.5"
+          github_following_cap: "10000"
+          target_end_following: "50"
           action_delay: "1"
         run: bash x
 
