@@ -41,6 +41,8 @@ jobs:
           max_pages_per_target: "8"
           ratio_start_mult: "40"
           ratio_anchor_fc: "87"
+          ratio_mid_fc: "500"
+          ratio_mid_cap: "1500"
           target_end_fc: "20000"
           target_end_following: "50"
           github_following_cap: "10000"
