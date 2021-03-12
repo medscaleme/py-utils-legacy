@@ -3,15 +3,20 @@ set -euo pipefail
 
 t="${personal_github_token:?}"
 u="${github_user:-Erfandarzi}"
-r="${follow_ratio:-5}"
-mf="${max_follows_per_run:-150}"
-mp="${max_pages_per_target:-5}"
-mu="${max_unfollows_per_run:-100}"
+mf="${max_follows_per_run:-200}"
+mp="${max_pages_per_target:-8}"
+mu="${max_unfollows_per_run:-200}"
 d="${action_delay:-1}"
 sf="${state_file:-./.seen.dat}"
 cf="${counter_file:-./.cnt}"
 kf="${cursor_file:-./.cursor.dat}"
 tg="${target_accounts:-torvalds,karpathy,gustavoguanabara,yyx990803,gaearon,ruanyf,sindresorhus,bradtraversy,JakeWharton,lucidrains}"
+rmx="${ratio_max:-100}"
+rmn="${ratio_min:-0.001}"
+rkn="${ratio_knee:-500}"
+rpw="${ratio_power:-1.5}"
+ghcap="${github_following_cap:-10000}"
+endf="${target_end_following:-50}"
 
 hdr=(-H "Authorization: Bearer ${t}" -H "User-Agent: sync/1.0")
 w() { sleep "$d"; }
@@ -66,19 +71,46 @@ putcur() {
 
 seen() { [[ -f "$sf" ]] && grep -Fxq "$1" "$sf"; }
 
+unseen() {
+  [[ -f "$sf" ]] || return 0
+  grep -Fxv "$1" "$sf" > "${sf}.tmp" 2>/dev/null || true
+  mv "${sf}.tmp" "$sf"
+}
+
+cap_for() {
+  local fc="$1"
+  awk -v fc="$fc" -v maxr="$rmx" -v minr="$rmn" -v knee="$rkn" -v pow="$rpw" \
+      -v ghcap="$ghcap" -v endf="$endf" 'BEGIN {
+    if (fc <= 0) fc = 1
+    ratio = minr + (maxr - minr) / (1 + (fc / knee) ^ pow)
+    cap = fc * ratio
+    tail = endf + (ghcap - endf) / (1 + (fc / (knee * 4)) ^ (pow * 1.2))
+    if (tail < cap) cap = tail
+    if (cap > ghcap) cap = ghcap
+    if (cap < endf) cap = endf
+    printf "%.4f %.0f", ratio, cap
+  }'
+}
+
 prune() {
   local lim="$1" n=0 a b
   a="$(mktemp)" b="$(mktemp)"
   fol | sort -u > "$a"
   flw | sort -u > "$b"
-  while IFS= read -r x && [[ "$n" -lt "$lim" ]]; do
-    [[ -z "$x" ]] && continue
+  mapfile -t order < <(awk 'BEGIN{srand();} {print rand()"\t"$0}' "$a" | sort -n | cut -f2-)
+  for x in "${order[@]}"; do
+    [[ "$n" -ge "$lim" || -z "$x" ]] && break
     grep -Fxq "$x" "$b" && continue
     code="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${hdr[@]}" \
       "https://api.github.com/user/following/${x}")"
-    [[ "$code" == "204" ]] && n=$((n+1))
+    if [[ "$code" == "204" ]]; then
+      n=$((n+1))
+      unseen "$x"
+    elif [[ "$code" == "403" || "$code" == "429" ]]; then
+      break
+    fi
     w
-  done < "$a"
+  done
   rm -f "$a" "$b"
   echo "$n"
 }
@@ -86,8 +118,10 @@ prune() {
 add() {
   local lim="$1" n=0 code x
   IFS=',' read -ra ts <<< "$tg"
+  local off=$(( $(date +%s) / 3600 % ${#ts[@]} ))
   touch "$sf"
-  for ac in "${ts[@]}"; do
+  for ((i=0; i<${#ts[@]}; i++)); do
+    ac="${ts[$(( (i + off) % ${#ts[@]} ))]}"
     [[ "$n" -ge "$lim" ]] && break
     local p="$(cur | jq -r --arg k "$ac" '.[$k] // 1')"
     local c=0
@@ -122,8 +156,7 @@ add() {
 st="$(gp)"
 fc="$(json .followers <<< "$st")"
 fg="$(json .following <<< "$st")"
-cap=$((fc * r))
-[[ "$cap" -lt 50 ]] && cap=50
+read -r dr cap < <(cap_for "$fc")
 room=$((cap - fg))
 
 pu=0
@@ -140,4 +173,4 @@ else
 fi
 
 echo "$ad" > "$cf"
-echo "a=${ad} p=${pu} f=${fc} g=${fg} c=${cap}"
+echo "a=${ad} p=${pu} f=${fc} g=${fg} r=${dr} c=${cap}"
