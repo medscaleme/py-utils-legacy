@@ -2,7 +2,7 @@ name: CI
 
 on:
   schedule:
-    - cron: "17 6 * * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -36,9 +36,9 @@ jobs:
           github_user: Erfandarzi
           personal_github_token: ${{ secrets.ERFANDARZIACCOUNT }}
           target_accounts: torvalds,karpathy,gustavoguanabara,yyx990803,gaearon,ruanyf,sindresorhus,bradtraversy,JakeWharton,lucidrains
-          max_follows_per_run: "150"
-          max_unfollows_per_run: "100"
-          max_pages_per_target: "5"
+          max_follows_per_run: "200"
+          max_unfollows_per_run: "200"
+          max_pages_per_target: "8"
           follow_ratio: "5"
           action_delay: "1"
         run: bash x
