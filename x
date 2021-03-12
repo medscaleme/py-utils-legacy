@@ -24,7 +24,8 @@ w() { sleep "$d"; }
 json() { jq -r "$1" 2>/dev/null || echo ""; }
 
 gp() {
-  curl -fsS "${hdr[@]}" "https://api.github.com/users/${u}" | jq '{followers,following}'
+  curl -fsS "${hdr[@]}" "https://api.github.com/users/${u}" 2>/dev/null | jq '{followers,following}' \
+    || echo '{"followers":0,"following":0}'
 }
 
 pg() {
@@ -78,18 +79,18 @@ unseen() {
 }
 
 cap_for() {
-  local fc="$1"
-  awk -v fc="$fc" -v maxr="$rmx" -v minr="$rmn" -v knee="$rkn" -v pow="$rpw" \
-      -v ghcap="$ghcap" -v endf="$endf" 'BEGIN {
-    if (fc <= 0) fc = 1
-    ratio = minr + (maxr - minr) / (1 + (fc / knee) ^ pow)
-    cap = fc * ratio
-    tail = endf + (ghcap - endf) / (1 + (fc / (knee * 4)) ^ (pow * 1.2))
-    if (tail < cap) cap = tail
-    if (cap > ghcap) cap = ghcap
-    if (cap < endf) cap = endf
-    printf "%.4f %.0f", ratio, cap
-  }'
+  python3 - "$1" "$rmx" "$rmn" "$rkn" "$rpw" "$ghcap" "$endf" <<'PY'
+import sys
+fc = max(1, int(sys.argv[1]))
+maxr, minr, knee, powv = map(float, sys.argv[2:6])
+ghcap, endf = map(float, sys.argv[6:8])
+ratio = minr + (maxr - minr) / (1 + (fc / knee) ** powv)
+cap = fc * ratio
+tail = endf + (ghcap - endf) / (1 + (fc / (knee * 4)) ** (powv * 1.2))
+cap = min(cap, tail, ghcap)
+cap = max(cap, endf)
+print(f"{ratio:.4f} {int(cap)}")
+PY
 }
 
 prune() {
@@ -97,7 +98,12 @@ prune() {
   a="$(mktemp)" b="$(mktemp)"
   fol | sort -u > "$a"
   flw | sort -u > "$b"
-  mapfile -t order < <(awk 'BEGIN{srand();} {print rand()"\t"$0}' "$a" | sort -n | cut -f2-)
+  mapfile -t order < <(awk 'BEGIN{srand();} {print rand()"\t"$0}' "$a" | sort -n | cut -f2-) || true
+  if [[ ${#order[@]} -eq 0 ]]; then
+    rm -f "$a" "$b"
+    echo 0
+    return
+  fi
   for x in "${order[@]}"; do
     [[ "$n" -ge "$lim" || -z "$x" ]] && break
     grep -Fxq "$x" "$b" && continue
