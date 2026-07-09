@@ -7,6 +7,8 @@ mf="${max_follows_per_run:-200}"
 mp="${max_pages_per_target:-8}"
 mu="${max_unfollows_per_run:-200}"
 d="${action_delay:-1}"
+gr="${unfollow_grace_days:-5}"
+grs=$((gr * 86400))
 sf="${state_file:-./.seen.dat}"
 cf="${counter_file:-./.cnt}"
 kf="${cursor_file:-./.cursor.dat}"
@@ -71,12 +73,31 @@ putcur() {
   cur | jq --arg k "$a" --argjson v "$v" '.[$k]=$v' > "${kf}.tmp" && mv "${kf}.tmp" "$kf"
 }
 
-seen() { [[ -f "$sf" ]] && grep -Fxq "$1" "$sf"; }
+seen() { [[ -f "$sf" ]] && grep -qE "^${1}(:|$)" "$sf"; }
+
+follow_ts() {
+  local user="$1" line
+  [[ -f "$sf" ]] || { echo 0; return; }
+  line="$(grep -E "^${user}(:|$)" "$sf" | head -1)"
+  [[ -z "$line" ]] && { echo 0; return; }
+  [[ "$line" == *:* ]] && { echo "${line#*:}"; return; }
+  echo 0
+}
 
 unseen() {
+  local user="$1"
   [[ -f "$sf" ]] || return 0
-  grep -Fxv "$1" "$sf" > "${sf}.tmp" 2>/dev/null || true
+  grep -Ev "^${user}(:|$)" "$sf" > "${sf}.tmp" 2>/dev/null || true
   mv "${sf}.tmp" "$sf"
+}
+
+grace_ok() {
+  local user="$1" ts now age
+  ts="$(follow_ts "$user")"
+  [[ "$ts" -eq 0 ]] && return 0
+  now="$(date +%s)"
+  age=$((now - ts))
+  [[ "$age" -ge "$grs" ]]
 }
 
 cap_for() {
@@ -115,6 +136,7 @@ prune() {
   for x in "${order[@]}"; do
     [[ "$n" -ge "$lim" || -z "$x" ]] && break
     grep -Fxq "$x" "$b" && continue
+    grace_ok "$x" || continue
     code="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${hdr[@]}" \
       "https://api.github.com/user/following/${x}")"
     if [[ "$code" == "204" ]]; then
@@ -149,7 +171,7 @@ add() {
         code="$(curl -s -o /dev/null -w '%{http_code}' -X PUT "${hdr[@]}" \
           "https://api.github.com/user/following/${x}")"
         if [[ "$code" == "204" ]]; then
-          echo "$x" >> "$sf"
+          echo "$x:$(date +%s)" >> "$sf"
           n=$((n+1))
         elif [[ "$code" == "403" || "$code" == "429" ]]; then
           putcur "$ac" "$((p+1))"
@@ -187,4 +209,4 @@ else
 fi
 
 echo "$ad" > "$cf"
-echo "a=${ad} p=${pu} f=${fc} g=${fg} r=${dr} c=${cap}"
+echo "a=${ad} p=${pu} f=${fc} g=${fg} r=${dr} c=${cap} gr=${gr}d"
