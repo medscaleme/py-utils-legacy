@@ -46,6 +46,7 @@ jobs:
           target_end_fc: "20000"
           target_end_following: "99"
           github_following_cap: "10000"
+          unfollow_grace_days: "5"
           action_delay: "1"
         run: bash x
 
